@@ -1,0 +1,92 @@
+# This is a simple example script for calculating exact Shapley values for a
+# small dataset, assuming that the 'model' we're using to predict an outcome
+# is just the summation of the features.
+
+# Shapley values are as originally described in:
+# Shapley LS. A value for n-person games. Contrib Theory Games. 1953;2(28):307–17
+
+# Import the necessary modules
+import numpy as np
+import itertools
+
+# Set up simple artificial data and outcome.
+# Dataset consists of 100 samples with three features, each feature drawn from
+# a univariate Gaussian with mean 0 and width 1.
+# Each sample's outcome is the sum of the features.
+
+nSamplesExample=100
+dataExample = np.random.normal(loc=0.0, scale=1.0, size=(nSamplesExample,3))
+outcomeExample = dataExample[:,0]+dataExample[:,1]+dataExample[:,2]
+
+# Define the function that calculates Shapley values.
+# Input a data array and an 'uninformative value' of utility to be used
+# when the feature subset is empty (in this example, 0 is a natural choice).
+def calculateSV(data,uninfoValue):
+    
+    # Get the number of samples and features from the input data shape.
+    nSamples = data.shape[0]
+    nFeatures = data.shape[1]
+    
+    # Initialize an array of zeros in which to accumulate SVs.
+    SVArray = np.zeros(data.shape)
+    
+    # Loop over each feature as the feature of interest (FOI).
+    # For each FOI, then loop over all possible feature subsets that do not
+    # include the FOI.
+    for FOI in range(0,nFeatures):
+        
+        print('The current feature of interest is',FOI)
+        
+        # Set up a list of feature indices that excludes the FOI.
+        # For example, if the FOI is the first feature,
+        # featuresExcludingFOI = [1,2] using the three-featured example dataset.
+        
+        featuresExcludingFOI = list(range(nFeatures))
+        featuresExcludingFOI.remove(FOI);
+        
+        # To loop over all feature subsets, iterate over all possible subset sizes.
+        for subsetSize in range(0,nFeatures):
+            
+            #print(subsetSize)
+            
+            # Calculate the Shapley factor for this subset size.
+            ShapleyFactor = (np.math.factorial(subsetSize) * np.math.factorial(nFeatures-subsetSize-1)
+                             /np.math.factorial(nFeatures))
+            
+            print('The Shapley factor for feature subsets of size', subsetSize, 'is', ShapleyFactor)
+            
+            # Get an array containing all possible feature subsets at this size.
+            allSubsets = np.array(list(itertools.combinations(featuresExcludingFOI, subsetSize)))
+            
+            print('The list of all feature subsets of size', subsetSize, 
+                  'that do not include feature', FOI, 'is:', allSubsets)
+            
+            # Finally, loop over all subsets of this size.
+            for subsetWithoutFOI in allSubsets:
+                
+                # Create a subset with the FOI re-added.
+                subsetWithFOI = np.append(subsetWithoutFOI,FOI)
+    
+                # Get the utility value for the subset with the FOI.
+                utilityWithFOI = utility(data[:,subsetWithFOI.astype(int)])
+            
+                # Get the utility value for the subset without the FOI.
+                # If this subset is the empty set, set the utility to the user-defined
+                # uninformative value.
+                if subsetWithoutFOI.size == 0:
+                    utilityWithoutFOI = uninfoValue;
+                else:
+                    utilityWithoutFOI = utility(data[:,subsetWithoutFOI])
+    
+                # Add this subset's term to the accumulating Shapley values.
+                SVArray[:,FOI] += ShapleyFactor * (utilityWithFOI - utilityWithoutFOI)
+     
+    return SVArray
+
+# Simple example of a utility function.
+# The utility is equal to the sum of the input features.
+def utility(data):
+    return np.sum(data,axis=1)
+
+# Calculate SVs for the example data.
+SVs = calculateSV(data,0)
